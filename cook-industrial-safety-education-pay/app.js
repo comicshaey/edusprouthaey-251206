@@ -1,478 +1,292 @@
-// 251118화 수정: fetch 실패 시에도 직종 목록이 뜨도록 내장 스냅샷 사용
-
-// 로컬용 기본 스냅샷 (영양사 / 조리사 / 조리실무사 + 정액급식비·상여·명절휴가비)
-const FALLBACK_DATA = {
-  meta: {
-    월통상임금산정시간: 209,
-    사용스냅샷: "2025.03.01"
-  },
-  snapshot: {
-    fixedAmounts: {
-      정액급식비: 150000,
-      정기상여금: 83330,
-      명절휴가비: 154160,
-      "교무행정사(직무수당)": 30000
-    },
-    jobs: [
-      {
-        직종: "영양사",
-        기본급: 2266000,
-        근속수당등급: "◎",
-        적용: {
-          정액급식비: "○",
-          위험수당: "×",
-          급식운영수당: "○",
-          기술정보수당: "×",
-          특수업무수당: "×",
-          특수교육지원수당: "×",
-          면허가산수당: "◎",
-          가족수당: "○",
-          정기상여금: "○",
-          명절휴가비: "○",
-          맞춤형복지: "○",
-          "교무행정사(직무수당)": "×"
-        },
-        일급: 86730
-      },
-      {
-        직종: "조리사",
-        기본급: 2169300,
-        근속수당등급: "◎",
-        적용: {
-          정액급식비: "○",
-          위험수당: "○",
-          급식운영수당: "×",
-          기술정보수당: "×",
-          특수업무수당: "×",
-          특수교육지원수당: "×",
-          면허가산수당: "×",
-          가족수당: "○",
-          정기상여금: "○",
-          명절휴가비: "○",
-          맞춤형복지: "○",
-          "교무행정사(직무수당)": "×"
-        },
-        일급: 83030
-      },
-      {
-        직종: "조리실무사",
-        기본급: 2066000,
-        근속수당등급: "◎",
-        적용: {
-          정액급식비: "○",
-          위험수당: "○",
-          급식운영수당: "×",
-          기술정보수당: "×",
-          특수업무수당: "×",
-          특수교육지원수당: "×",
-          면허가산수당: "×",
-          가족수당: "○",
-          정기상여금: "○",
-          명절휴가비: "○",
-          맞춤형복지: "○",
-          "교무행정사(직무수당)": "×"
-        },
-        일급: 79080
-      }
-    ]
-  }
-};
-
-// data.json 로딩 (서버에서 열면 data.json 우선, file://에서 실패하면 FALLBACK_DATA 사용)
-async function loadData(){
-  const urls = ['data.json', './data.json', '/ordinary-wage/data.json'];
-  let lastErr = null;
-  for(const u of urls){
-    try{
-      const r = await fetch(u + '?v=' + Date.now());
-      if(!r.ok) throw new Error('HTTP ' + r.status);
-      const txt = await r.text();
-      return JSON.parse(txt.replace(/\bNaN\b/g,'0'));
-    }catch(e){
-      console.warn('[ordinary-wage] data.json 로딩 실패:', u, e);
-      lastErr = e;
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>조리종사원 산안전보건교육 인건비 계산기</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif;
+      color:#111;
+      background:#fff;
+      margin:0;
     }
-  }
-  console.warn('[ordinary-wage] data.json을 불러오지 못해 내장 스냅샷(FALLBACK_DATA)을 사용합니다.');
-  return FALLBACK_DATA;
-}
+    .wrap{max-width:960px;margin:24px auto;padding:0 16px}
+    h1{font-size:1.4rem;margin:8px 0 14px}
+    .card{
+      border:1px solid #e5e5e5;
+      border-radius:16px;
+      padding:16px;
+      margin:12px 0;
+      overflow:hidden;
+      background:#fff;
+    }
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .col{flex:1 1 240px;min-width:240px}
+    label{display:block;font-weight:600;margin-bottom:6px}
+    select,input[type=number],input[type=date]{
+      width:100%;
+      padding:10px 12px;
+      border:1px solid #d0d0d0;
+      border-radius:12px;
+      font-size:1rem;
+      box-sizing:border-box;
+    }
+    .allow-row{
+      display:grid;
+      grid-template-columns:1fr 180px;
+      align-items:center;
+      gap:10px;
+      margin:8px 0;
+    }
+    .allow-row input{max-width:180px}
+    .muted{color:#444;font-size:.92rem}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .out{font-size:1.1rem;font-weight:700}
+    .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    a.btn,button.btn{
+      display:inline-block;
+      padding:10px 14px;
+      border:1px solid #222;
+      border-radius:12px;
+      color:#111;
+      text-decoration:none;
+      font-weight:700;
+      background:#fff;
+      cursor:pointer;
+    }
+    footer{text-align:center;margin:24px 0;color:#444}
+    .disabled{background:#fafafa;color:#777}
 
-// 돈 표기 (원단위 반올림)
-function money(n){
-  return (Math.round(n)||0).toLocaleString();
-}
+    /* 산안전보건교육 카드 전용 */
+    .sub-title{font-size:1.1rem;margin:0 0 8px}
+    .field-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
+    .field{flex:1 1 200px;min-width:200px}
+    .field label{font-size:0.9rem;margin-bottom:4px}
+    .field input{
+      width:100%;
+      padding:7px 9px;
+      font-size:0.95rem;
+      border:1px solid #ccc;
+      border-radius:6px;
+      box-sizing:border-box;
+    }
+    .btn-row{
+      margin-top:10px;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .btn.small{padding:7px 12px;font-size:0.88rem;border-radius:999px}
+    .btn.secondary{background:#f3f4f6;color:#111;border-color:#d1d5db}
+    .result{
+      margin-top:12px;
+      padding:10px;
+      background:#f9fafb;
+      border-radius:8px;
+      font-size:0.9rem;
+    }
+    .result table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:0.9rem;
+    }
+    .result th,.result td{
+      padding:4px 2px;
+      text-align:right;
+    }
+    .result th:first-child,.result td:first-child{text-align:left}
+    .result tr:nth-child(even){background:#f3f4f6}
+    .result-strong{font-weight:700;font-size:1rem}
+    .note{margin-top:6px;font-size:0.8rem;color:#6b7280}
 
-// 10원 단위 절사
-function floor10(v){
-  const n = Number(v) || 0;
-  return Math.floor(n / 10) * 10;
-}
-
-// 수당 입력칸 구성
-function rebuildAllowanceInputs(box, job, fixed){
-  box.innerHTML='';
-  const names=[
-    "정액급식비","위험수당","급식운영수당","기술정보수당",
-    "특수업무수당","특수교육지원수당","면허가산수당",
-    "정기상여금","명절휴가비","교무행정사(직무수당)"
-  ];
-  for(const name of names){
-    const flag = job?.적용?.[name] || '×';
-    const row = document.createElement('div');
-    row.className='allow-row';
-
-    const lab = document.createElement('label');
-    lab.textContent = name + (flag==='×' ? ' (미적용)' : ' (적용)');
-
-    const inp = document.createElement('input');
-    inp.type='number';
-    inp.min='0';
-    inp.step='1';
-    inp.value = (fixed?.[name] || 0);
-    inp.dataset.name = name;
-
-    if(flag==='×'){
-      inp.disabled = true;
-      inp.classList.add('disabled');
+    .inline-toggle{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      font-size:0.85rem;
+      margin-top:6px;
     }
 
-    row.appendChild(lab);
-    row.appendChild(inp);
-    box.appendChild(row);
-  }
-}
-
-// 날짜 파싱
-function parseYmd(s){
-  if(!s) return null;
-  const m = s.match(/(\d{4})-(\d{2})-(\d{2})/);
-  if(!m) return null;
-  return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
-}
-
-// 근속연수 계산
-function calcYears(startDateStr, calcDateStr){
-  const s = parseYmd(startDateStr);
-  const b = parseYmd(calcDateStr);
-  if(!s || !b) return null;
-  let y = b.getFullYear() - s.getFullYear();
-  const anniv = new Date(b.getFullYear(), s.getMonth(), s.getDate());
-  if(b < anniv) y -= 1;
-  return Math.max(0, y);
-}
-
-// 근속수당: 연 40,000원, 상한 23년
-function computeTenureAmount(years){
-  const y = Math.max(0, Math.min(Number(years||0), 23));
-  return y * 40000;
-}
-
-document.addEventListener('DOMContentLoaded', async ()=>{
-  const note = document.getElementById('note');
-  const jobSel = document.getElementById('job');
-  const yearsInp = document.getElementById('years');
-  const startDateInp = document.getElementById('startDate');
-  const calcDateInp = document.getElementById('calcDate');
-  const yearsMode = document.getElementById('yearsMode');
-  const allowBox = document.getElementById('allowBox');
-  const outBase = document.getElementById('outBase');
-  const outTenure = document.getElementById('outTenure');
-  const outSum = document.getElementById('outSum');
-  const outHourly = document.getElementById('outHourly');
-  const resetBtn = document.getElementById('resetBtn');
-
-  // 방학 집체교육 DOM
-  const vacAuto   = document.getElementById('vacAuto');
-  const vacBasic  = document.getElementById('vacBasic');
-  const vacMeal   = document.getElementById('vacMeal');
-  const vacDays   = document.getElementById('vacDays');
-  const vacEduH   = document.getElementById('vacEduHours');
-  const vacMinWage= document.getElementById('vacMinWage');
-  const vacResult = document.getElementById('vacResult');
-  const vacCalcBtn= document.getElementById('vacCalcBtn');
-  const vacResetBtn=document.getElementById('vacResetBtn');
-
-  // 학기중 온라인 교육 DOM
-  const eduUseManual     = document.getElementById('eduUseManual');
-  const eduManualHourly  = document.getElementById('eduManualHourly');
-  const eduMultiplierInp = document.getElementById('eduMultiplier');
-  const eduHoursInp      = document.getElementById('eduHours');
-  const outEduBaseHourly = document.getElementById('outEduBaseHourly');
-  const outEduOverHourly = document.getElementById('outEduOverHourly');
-  const outEduAmount     = document.getElementById('outEduAmount');
-
-  let data;
-  try{
-    data = await loadData();
-  }catch(e){
-    // 여기까지 올 일은 거의 없지만, 혹시 모르면 FALLBACK라도 사용
-    console.error('[ordinary-wage] 데이터 로딩 완전 실패, 내장 스냅샷으로 대체:', e);
-    data = FALLBACK_DATA;
-  }
-
-  const snap = data.snapshot || {jobs:[], fixedAmounts:{}};
-  note.textContent =
-    ' (수당 기준일: ' +
-    (data.meta?.사용스냅샷 || '2025.03.01') +
-    ', 월 ' +
-    (data.meta?.월통상임금산정시간 || 209) +
-    '시간 기준)';
-
-  // 직종 목록 채우기 (영양사, 조리사, 조리실무사만)
-  jobSel.innerHTML = '';
-  const targetJobs = ["영양사", "조리사", "조리실무사"];
-
-  if(Array.isArray(snap.jobs) && snap.jobs.length > 0){
-    for(const j of snap.jobs){
-      if(!j || !j.직종) continue;
-      if(!targetJobs.includes(j.직종)) continue;
-
-      const op = document.createElement('option');
-      op.value = j.직종;
-      op.textContent = j.직종;
-      jobSel.appendChild(op);
+    @media (max-width:600px){
+      .card{border-radius:12px;padding:14px 12px}
     }
-  }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>
+      조리종사원 산안전보건교육 인건비 계산기
+      <span id="note" class="muted"></span>
+    </h1>
 
-  if(jobSel.options.length === 0){
-    console.warn('[ordinary-wage] jobs 비어 있음 또는 대상 직종 없음: data.json / FALLBACK_DATA 구조 확인 필요');
-    jobSel.innerHTML = '<option>직종 데이터 없음</option>';
-  }
+    <!-- 통상임금 계산 블록 -->
+    <div class="card">
+      <div class="row">
+        <div class="col">
+          <label>직종</label>
+          <select id="job"></select>
+        </div>
+        <div class="col">
+          <label>임금 계산 시점</label>
+          <input id="calcDate" type="date" />
+        </div>
+        <div class="col">
+          <label>최초 임용일자</label>
+          <input id="startDate" type="date" />
+          <div class="muted" id="yearsMode" style="margin-top:6px;"></div>
+        </div>
+        <div class="col">
+          <label>근속연수</label>
+          <input id="years" type="number" min="0" step="1" value="0" />
+        </div>
+      </div>
+      <p class="muted">
+        ·최초 임용일 및 계산 시점 입력 시 근속연수 자동 계산됨.<br/>
+        ·2025.3.1.일자 기준 교육공무직 보수표 참고. 209시간 적용 
+      </p>
+      <div class="btns">
+        <button class="btn" id="resetBtn" type="button">입력값 초기화</button>
+      </div>
+    </div>
 
-  // 계산 시점 기본값: 오늘
-  const today = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  calcDateInp.value =
-    today.getFullYear() + '-' +
-    pad(today.getMonth()+1) + '-' +
-    pad(today.getDate());
+    <div class="card">
+      <h2 style="font-size:1.1rem;margin:0 0 10px">임금 적용 수당</h2>
+      <div id="allowBox"></div>
+    </div>
 
-  function readAllowMap(){
-    const m = {};
-    allowBox.querySelectorAll('input[type=number]').forEach(i=>{
-      if(!i.disabled) m[i.dataset.name] = Number(i.value||0);
-    });
-    return m;
-  }
+    <div class="card grid2">
+      <div>
+        <div class="muted">기본급</div>
+        <div class="out" id="outBase">-</div>
+      </div>
+      <div>
+        <div class="muted">근속수당</div>
+        <div class="out" id="outTenure">-</div>
+      </div>
+      <div>
+        <div class="muted">합계</div>
+        <div class="out" id="outSum">-</div>
+      </div>
+      <div>
+        <div class="muted">통상임금</div>
+        <div class="out" id="outHourly">-</div>
+      </div>
+    </div>
 
-  function syncYearsMode(){
-    if(startDateInp.value){
-      yearsInp.disabled = true;
-      yearsInp.classList.add('disabled');
-      yearsMode.textContent = '입사일 기준 자동 계산 중';
-    }else{
-      yearsInp.disabled = false;
-      yearsInp.classList.remove('disabled');
-      yearsMode.textContent = '미입력 시 근속연수 수동 입력 가능';
-    }
-  }
+    <!-- 1. 방학 중 집체교육 -->
+    <div class="card">
+      <h2 class="sub-title">1. 방학 중 집체교육 (최저임금 보전)</h2>
+      <p class="muted">
+        ·공무직 보수 업무편람 참고. 방학 중 집체교육은 기본급과 정액급식비만 반영.<br/>
+        ·월 보수 → 일단위 보수 → 시간단위 보수 계산 후 교육시간 비례 산정함.<br/>
+        ·비례 산정한 금액이 최저시급보다 적으면 차액 보전함. (사실상 방학중 집체교육은 최저시급으로 지급하면 된다고 생각하면 됨)
+      </p>
 
-  let lastHourly = 0;   // 통상임금 시급
-  let lastJob = null;   // 최근 선택 직종 정보
+      <div class="inline-toggle">
+        <input type="checkbox" id="vacAuto" checked />
+        <label for="vacAuto">선택한 직종 기준 기본급·정액급식비 자동 불러오기</label>
+      </div>
 
-  // 방학 집체교육: 직종 자동모드 적용
-  function applyVacAuto(){
-    if(!vacAuto || !lastJob) return;
+      <div class="field-row">
+        <div class="field">
+          <label for="vacBasic">기본급</label>
+          <input id="vacBasic" type="number" placeholder="예: 2,069,600" />
+        </div>
+        <div class="field">
+          <label for="vacMeal">정액급식비</label>
+          <input id="vacMeal" type="number" value="150000" />
+        </div>
+      </div>
 
-    if(vacAuto.checked){
-      const base = Number(lastJob.기본급 || 0);
-      const fixed = snap.fixedAmounts || {};
-      const meal = Number(fixed["정액급식비"] || 0);
+      <div class="field-row">
+        <div class="field">
+          <label for="vacDays">달력상 일수 (해당월)</label>
+          <input id="vacDays" type="number" value="31" />
+        </div>
+        <div class="field">
+          <label for="vacEduHours">교육시간</label>
+          <input id="vacEduHours" type="number" step="0.5" value="6" />
+        </div>
+      </div>
 
-      vacBasic.value = base ? String(base) : "";
-      vacMeal.value  = meal ? String(meal) : "";
+      <div class="field-row">
+        <div class="field">
+          <label for="vacMinWage">해당 연도 최저시급</label>
+          <input id="vacMinWage" type="number" value="10030" />
+        </div>
+      </div>
 
-      vacBasic.disabled = true;
-      vacMeal.disabled  = true;
-      vacBasic.classList.add('disabled');
-      vacMeal.classList.add('disabled');
-    }else{
-      vacBasic.disabled = false;
-      vacMeal.disabled  = false;
-      vacBasic.classList.remove('disabled');
-      vacMeal.classList.remove('disabled');
-    }
-  }
+      <div class="btn-row">
+        <button type="button" class="btn small" id="vacCalcBtn">계산하기</button>
+        <button type="button" class="btn small secondary" id="vacResetBtn">초기화</button>
+      </div>
 
-  // 학기 중 온라인 교육: 기준 시급 재계산
-  function recalcEdu(){
-    const useManual = eduUseManual && eduUseManual.checked;
-    let baseHourly = 0;
+      <div id="vacResult" class="result" style="display:none;"></div>
 
-    if(useManual){
-      const manual = Number(eduManualHourly.value || 0);
-      baseHourly = manual;
-    }else{
-      baseHourly = lastHourly;
-    }
+      <p class="note">
+        ·원단위 산출 후 원 단위 절삭.
+      </p>
+    </div>
 
-    const eduH = Number(eduHoursInp.value || 0);
-    const mult = Number(eduMultiplierInp.value || 0);
+    <!-- 2. 학기 중 주말 온라인 교육 -->
+    <div class="card">
+      <h2 class="sub-title">2. 학기 중 주말 온라인 교육</h2>
+      <p class="muted">
+        ·보통 일요일에 초과근무로 온라인 교육 들어서 통상임금에 법외 1.5배 가산됨.<br/>
+      </p>
 
-    if(!baseHourly || !mult || !eduH){
-      outEduBaseHourly.textContent = baseHourly ? money(baseHourly) : '-';
-      outEduOverHourly.textContent = '-';
-      outEduAmount.textContent = '0';
-      return;
-    }
+      <div class="inline-toggle">
+        <input type="checkbox" id="eduUseManual" />
+        <label for="eduUseManual">시간당 임금 직접 입력</label>
+      </div>
 
-    const overHourlyRaw = baseHourly * mult;
-    const overHourly = floor10(overHourlyRaw);
-    const amountRaw = overHourly * eduH;
-    const amount = floor10(amountRaw);
+      <div class="field-row">
+        <div class="field">
+          <label for="eduManualHourly">시간당 임금 직접 입력 (선택사항)</label>
+          <input id="eduManualHourly" type="number" placeholder="예: 15,000" disabled />
+        </div>
+        <div class="field">
+          <label for="eduMultiplier">법외 연장근로 가산배율</label>
+          <input id="eduMultiplier" type="number" step="0.1" value="1.5" />
+        </div>
+        <div class="field">
+          <label for="eduHours">교육시간</label>
+          <input id="eduHours" type="number" step="0.5" value="6" />
+        </div>
+      </div>
 
-    outEduBaseHourly.textContent = money(baseHourly);
-    outEduOverHourly.textContent = money(overHourly);
-    outEduAmount.textContent = money(amount);
-  }
+      <div class="grid2" style="margin-top:12px">
+        <div>
+          <div class="muted">통상임금 (시급 직접 입력 가능)</div>
+          <div class="out" id="outEduBaseHourly">-</div>
+        </div>
+        <div>
+          <div class="muted">초과근무수당 (법외 1.5배 가산 적용)</div>
+          <div class="out" id="outEduOverHourly">-</div>
+        </div>
+        <div>
+          <div class="muted">온라인 교육 인건비 총 지급액</div>
+          <div class="out" id="outEduAmount">-</div>
+        </div>
+      </div>
 
-  function recalc(){
-    const job = (snap.jobs||[]).find(j=>j.직종===jobSel.value) ||
-                (snap.jobs||[]).find(j=>targetJobs.includes(j.직종));
-    if(!job){ return; }
+      <p class="note">
+        ·직종 및 수당 입력 후 통상임금 값이 0이 아니면 정상 작동.<br/>
+        ·주휴수당 성립 여부는 별도 문제라 계산에 포함하지 않음.
+      </p>
+    </div>
 
-    lastJob = job;
+    <div class="btns">
+      <a class="btn" href="/">메인으로 돌아가기</a>
+    </div>
 
-    if(startDateInp.value){
-      const y = calcYears(startDateInp.value, calcDateInp.value);
-      if(y!=null) yearsInp.value = y;
-    }
-    syncYearsMode();
+    <footer>
+      제작자: 귀여운 고주무관 · Contact: edusproutcomics@naver.com · 개인적인 토이 프로젝트입니다.
+    </footer>
+  </div>
 
-    const years = Number(yearsInp.value || 0);
-    const tAmt  = computeTenureAmount(years);
-    const base  = Number(job.기본급 || 0);
-    const allowMap = readAllowMap();
-    const sum   = base + tAmt + Object.values(allowMap).reduce((a,b)=>a+b,0);
-    const hourlyRaw = sum / (data.meta?.월통상임금산정시간 || 209);
-    const hourly = Math.round(hourlyRaw);
-
-    lastHourly = hourly;
-
-    outBase.textContent   = money(base);
-    outTenure.textContent = money(tAmt) + ' (연 40,000원, 상한 23년)';
-    outSum.textContent    = money(sum);
-    outHourly.textContent = money(hourly);
-
-    applyVacAuto();
-    recalcEdu();
-  }
-
-  // 방학 집체교육 계산
-  function calcVacation(){
-    const basic   = Number(vacBasic.value)   || 0;
-    const meal    = Number(vacMeal.value)    || 0;
-    const days    = Number(vacDays.value)    || 0;
-    const eduH    = Number(vacEduH.value)    || 0;
-    const minWage = Number(vacMinWage.value) || 0;
-
-    if(!basic || !days || !eduH || !minWage){
-      vacResult.style.display = 'block';
-      vacResult.innerHTML = '<p>기본급, 월 일수, 교육시간, 최저시급을 모두 입력해 주세요.</p>';
-      return;
-    }
-
-    const monthlyTotal = basic + meal;
-    const dailyRaw = monthlyTotal / days;
-    const dailyPay = floor10(dailyRaw);
-
-    const hourlyRaw = dailyPay / 8;
-    const hourlyPay = floor10(hourlyRaw);
-
-    const eduRaw = hourlyPay * eduH;
-    const eduPay = floor10(eduRaw);
-
-    const minPayRaw = minWage * eduH;
-    const minPay = floor10(minPayRaw);
-
-    let extra = 0;
-    let finalPay = eduPay;
-    if(eduPay < minPay){
-      extra = minPay - eduPay;
-      finalPay = minPay;
-    }
-
-    vacResult.style.display = 'block';
-    vacResult.innerHTML = `
-      <table>
-        <tr><th>항목</th><th>금액</th></tr>
-        <tr><td>월임금 (기본급 + 정액급식비)</td><td>${money(monthlyTotal)}</td></tr>
-        <tr><td>일급 (월임금 ÷ 월일수, 10원 단위 절사)</td><td>${money(dailyPay)}</td></tr>
-        <tr><td>시간급 (일급 ÷ 8시간, 10원 단위 절사)</td><td>${money(hourlyPay)}</td></tr>
-        <tr><td>교육시간 임금 (시간급 × ${eduH}시간, 10원 단위 절사)</td><td>${money(eduPay)}</td></tr>
-        <tr><td>최저임금 기준 (최저시급 × ${eduH}시간, 10원 단위 절사)</td><td>${money(minPay)}</td></tr>
-        <tr><td>최저임금 보전 추가액</td><td>${money(extra)}</td></tr>
-        <tr><td class="result-strong">최종 지급액</td><td class="result-strong">${money(finalPay)}</td></tr>
-      </table>
-    `;
-  }
-
-  function resetVacation(){
-    vacAuto.checked = true;
-    vacDays.value   = '31';
-    vacEduH.value   = '6';
-    vacMinWage.value= '10030';
-    vacResult.style.display = 'none';
-    vacResult.innerHTML = '';
-    applyVacAuto();
-  }
-
-  function resetEdu(){
-    eduUseManual.checked = false;
-    eduManualHourly.value = '';
-    eduManualHourly.disabled = true;
-    eduMultiplierInp.value = '1.5';
-    eduHoursInp.value = '6';
-    recalcEdu();
-  }
-
-  // 수당 입력칸 기본 구성 (첫 대상 직종 기준)
-  rebuildAllowanceInputs(
-    allowBox,
-    (snap.jobs||[]).find(j=>targetJobs.includes(j.직종)) || {},
-    snap.fixedAmounts || {}
-  );
-
-  // 이벤트 바인딩
-  jobSel.addEventListener('change', recalc);
-  yearsInp.addEventListener('input', recalc);
-  allowBox.addEventListener('input', recalc);
-  startDateInp.addEventListener('input', recalc);
-  calcDateInp.addEventListener('input', recalc);
-
-  resetBtn.addEventListener('click', ()=>{
-    yearsInp.value = 0;
-    startDateInp.value = '';
-    const now = new Date();
-    calcDateInp.value =
-      now.getFullYear() + '-' +
-      String(now.getMonth()+1).padStart(2,'0') + '-' +
-      String(now.getDate()).padStart(2,'0');
-    recalc();
-  });
-
-  if(vacCalcBtn)  vacCalcBtn.addEventListener('click', calcVacation);
-  if(vacResetBtn) vacResetBtn.addEventListener('click', resetVacation);
-  if(vacAuto){
-    vacAuto.addEventListener('change', applyVacAuto);
-  }
-
-  if(eduUseManual){
-    eduUseManual.addEventListener('change', ()=>{
-      const useManual = eduUseManual.checked;
-      eduManualHourly.disabled = !useManual;
-      if(!useManual){
-        eduManualHourly.value = '';
-      }
-      recalcEdu();
-    });
-  }
-  if(eduHoursInp)      eduHoursInp.addEventListener('input', recalcEdu);
-  if(eduMultiplierInp) eduMultiplierInp.addEventListener('input', recalcEdu);
-  if(eduManualHourly)  eduManualHourly.addEventListener('input', recalcEdu);
-
-  // 초기 계산·세팅
-  recalc();
-  resetVacation();
-  resetEdu();
-});
+  <script src="app.js"></script>
+</body>
+</html>
