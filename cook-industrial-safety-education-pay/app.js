@@ -93,7 +93,7 @@ async function loadData(){
       lastErr = e;
     }
   }
-  console.warn('[ordinary-wage] 에러');
+  console.warn('[ordinary-wage] data.json을 불러오지 못해 내장 스냅샷(FALLBACK_DATA)을 사용합니다.');
   return FALLBACK_DATA;
 }
 
@@ -102,7 +102,7 @@ function money(n){
   return (Math.round(n)||0).toLocaleString();
 }
 
-// 원 단위 절사
+// 10원 단위 절사
 function floor10(v){
   const n = Number(v) || 0;
   return Math.floor(n / 10) * 10;
@@ -205,14 +205,14 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   try{
     data = await loadData();
   }catch(e){
-    console.error('[ordinary-wage] 에러:', e);
+    console.error('[ordinary-wage] 데이터 로딩 완전 실패, 내장 스냅샷으로 대체:', e);
     data = FALLBACK_DATA;
   }
 
   const snap = data.snapshot || {jobs:[], fixedAmounts:{}};
   note.textContent =
     ' (수당 기준일: ' +
-    (data.meta?.사용스냅샷 || '2025.3.1') +
+    (data.meta?.사용스냅샷 || '2025.03.01') +
     ', 월 ' +
     (data.meta?.월통상임금산정시간 || 209) +
     '시간 기준)';
@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   }
 
   if(jobSel.options.length === 0){
-    console.warn('[ordinary-wage] 에러');
+    console.warn('[ordinary-wage] jobs 비어 있음 또는 대상 직종 없음: data.json / FALLBACK_DATA 구조 확인 필요');
     jobSel.innerHTML = '<option>직종 데이터 없음</option>';
   }
 
@@ -258,7 +258,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     if(startDateInp.value){
       yearsInp.disabled = true;
       yearsInp.classList.add('disabled');
-      yearsMode.textContent = '최초 임용일 기준 자동 계산 중';
+      yearsMode.textContent = '입사일 기준 자동 계산 중';
     }else{
       yearsInp.disabled = false;
       yearsInp.classList.remove('disabled');
