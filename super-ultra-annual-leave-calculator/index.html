@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>연차 유급휴가 울트라 계산기 (정적 페이지)</title>
+  <link rel="icon" href="/static/favicon.ico" />
+  <style>
+    :root{
+      --black:#111;
+      --line:#e5e5e5;
+      --sun:#c8352d;
+      --sat:#1e5fbf;
+      --accent:#111;
+      --bg:#fff;
+      --card-bg:#fff;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background:var(--bg);
+      color:var(--black);
+      font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans KR",Arial,sans-serif;
+      line-height:1.5;
+    }
+    .wrap{
+      max-width:960px;
+      margin:0 auto;
+      padding:16px 12px 40px;
+    }
+    h1{
+      font-size:1.4rem;
+      margin:8px 0 4px;
+    }
+    .sub{
+      margin:0 0 12px;
+      font-size:0.9rem;
+      color:#666;
+    }
+    h2{
+      font-size:1.1rem;
+      margin:0 0 8px;
+    }
+    h3{
+      font-size:1rem;
+      margin:0 0 6px;
+    }
+    .card{
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:16px 14px;
+      margin:10px 0;
+      background:var(--card-bg);
+    }
+    label{
+      font-size:0.9rem;
+      display:block;
+      margin:0 0 4px;
+    }
+    .row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      margin:4px 0;
+    }
+    .field{
+      flex:1 1 160px;
+      min-width:0;
+    }
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    select{
+      width:100%;
+      padding:6px 8px;
+      border:1px solid #ccc;
+      border-radius:8px;
+      font-size:0.9rem;
+    }
+    input[type="number"]{
+      text-align:right;
+    }
+    .small{
+      font-size:0.8rem;
+      color:#777;
+    }
+    .btn-row{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top:8px;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:6px 12px;
+      border-radius:999px;
+      border:1px solid var(--black);
+      background:var(--black);
+      color:#fff;
+      font-size:0.9rem;
+      cursor:pointer;
+      text-decoration:none;
+      white-space:nowrap;
+    }
+    .btn.outline{
+      background:#fff;
+      color:var(--black);
+    }
+    .btn:disabled{
+      opacity:0.5;
+      cursor:default;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:0.85rem;
+    }
+    th,td{
+      border:1px solid var(--line);
+      padding:4px 6px;
+      text-align:center;
+    }
+    th{
+      background:#fafafa;
+      font-weight:600;
+    }
+    td input{
+      width:100%;
+      padding:4px 6px;
+      border:1px solid #ccc;
+      border-radius:6px;
+      font-size:0.8rem;
+    }
+    .result-grid{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      font-size:0.92rem;
+    }
+    .result-item{
+      display:flex;
+      align-items:baseline;
+      gap:8px;
+    }
+    .result-label{
+      min-width:180px;
+      font-weight:600;
+    }
+    .result-value{
+      margin-left:auto;
+      text-align:right;
+      font-variant-numeric:tabular-nums;
+    }
+    .tag{
+      display:inline-flex;
+      align-items:center;
+      padding:2px 8px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      font-size:0.75rem;
+      color:#555;
+      margin-left:4px;
+    }
+    .danger{
+      color:#c8352d;
+    }
+    .muted{
+      color:#777;
+    }
+    .highlight{
+      font-size:1.1rem;
+      font-weight:700;
+    }
+    hr{
+      border:0;
+      border-top:1px solid var(--line);
+      margin:12px 0;
+    }
+    @media (max-width:600px){
+      .result-label{min-width:140px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>연차 유급휴가 울트라 계산기 (정적)</h1>
+      <p class="sub">
+        인사·복무 정보를 수동으로 입력해서
+        <b>연차 부여일수 · 사용일수 · 미사용수당</b>을 계산하는 정적 페이지 버전입니다.<br>
+        <span class="small">
+          ※ 실제 단체협약·지침과 다를 수 있으므로, 결과는 반드시 한 번 더 검증해서 사용하세요.
+        </span>
+      </p>
+    </header>
+
+    <!-- 1. 기본 정보 -->
+    <section class="card">
+      <h2>1. 기본정보</h2>
+      <div class="row">
+        <div class="field">
+          <label for="year">연차 기준연도</label>
+          <input type="number" id="year" value="2025" min="2000" max="2100" />
+        </div>
+        <div class="field">
+          <label for="baseDate">
+            연차 기준일
+            <span class="small">(예: 2025-01-01 또는 2025-03-01)</span>
+          </label>
+          <input type="date" id="baseDate" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="hireDate">최초 임용(입사)일자</label>
+          <input type="date" id="hireDate" />
+        </div>
+        <div class="field">
+          <label for="jobType">직종</label>
+          <select id="jobType">
+            <option value="">선택</option>
+            <option value="조리사">조리사</option>
+            <option value="조리실무사">조리실무사</option>
+            <option value="행정실무사">행정실무사</option>
+            <option value="사서">사서</option>
+            <option value="돌봄전담사">돌봄전담사</option>
+            <option value="기타">기타(직접입력)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="jobTypeCustom">직종 직접입력 (선택)</label>
+          <input type="text" id="jobTypeCustom" placeholder="기타 직종 메모용" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="workType">근무형태</label>
+          <select id="workType">
+            <option value="상시">상시근로자</option>
+            <option value="비상시">방학중 비상시근로자</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>기준일 현재 근속연수 (자동계산)</label>
+          <div id="serviceYearsView" class="small muted">입사일·기준일 입력 시 표시됩니다.</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn outline" type="button" onclick="calcServiceYears()">근속연수 계산</button>
+      </div>
+    </section>
+
+    <!-- 2. 출근율 / 월 개근 입력 -->
+    <section class="card">
+      <h2>2. 출근율 / 월별 개근 정보</h2>
+      <p class="small">
+        해당 연도 1년치 <b>소정근로일수 / 실제 근로일수</b>를 월별로 입력하면
+        <b>연간 출근율</b>과 <b>월 개근 개월수</b>를 자동 계산합니다.
+        (나이스·근무상황부 보고 그대로 옮기는 용도)
+      </p>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>월</th>
+              <th>소정근로일수</th>
+              <th>실제 근로일수</th>
+            </tr>
+          </thead>
+          <tbody id="attBody">
+            <!-- JS에서 1~12월 자동 생성 -->
+          </tbody>
+        </table>
+      </div>
+      <div class="btn-row">
+        <button class="btn outline" type="button" onclick="fillDefaultWorkingDays()">소정근로일 대략 채우기</button>
+        <button class="btn" type="button" onclick="calcAttendance()">출근율 계산</button>
+      </div>
+      <hr>
+      <div class="result-grid">
+        <div class="result-item">
+          <div class="result-label">연간 소정근로일수 합계</div>
+          <div class="result-value" id="totalPlannedView">-</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">연간 실제 근로일수 합계</div>
+          <div class="result-value" id="totalWorkedView">-</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">연간 출근율</div>
+          <div class="result-value" id="attendanceRateView">-</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">월 개근 개월 수(소정=실제)</div>
+          <div class="result-value" id="fullMonthCountView">-</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 연차 부여·사용 정보 -->
+    <section class="card">
+      <h2>3. 연차 부여·사용 정보</h2>
+      <p class="small">
+        근속연수·출근율을 바탕으로 <b>단순 법정 기준</b>에 따라
+        <b>추천 부여연차일수</b>를 계산하고, 필요하면 직접 수정할 수 있습니다.
+        (교육공무직 단협·기관별 단가 규정은 별도 확인 필요)
+      </p>
+
+      <div class="row">
+        <div class="field">
+          <label>추천 부여연차일수
+            <span class="tag">근로기준법 일반 로직</span>
+          </label>
+          <div id="suggestedDaysView" class="small muted">
+            근속연수·출근율 계산 후 [연차일수 추천계산] 버튼을 눌러주세요.
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" type="button" onclick="suggestAnnualDays()">연차일수 추천계산</button>
+      </div>
+
+      <hr>
+
+      <div class="row">
+        <div class="field">
+          <label for="grantedDays">
+            실제 부여 연차일수
+            <span class="small">(지침·단협 기준 일수 직접 입력 가능)</span>
+          </label>
+          <input type="number" id="grantedDays" min="0" step="0.5" placeholder="예: 26" />
+        </div>
+        <div class="field">
+          <label for="usedDays">연차 사용일수 합계</label>
+          <input type="number" id="usedDays" min="0" step="0.5" placeholder="예: 12.5" />
+          <div class="small">
+            시간단위 연차는 <b>일수로 환산</b>해서 합산 입력 (예: 2일 4시간 → 2.5일)
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 임금 정보 -->
+    <section class="card">
+      <h2>4. 임금 정보</h2>
+      <p class="small">
+        미사용 연차수당 계산을 위해 <b>통상임금(시급/월급 등)</b>을 입력합니다.
+        실제 계산 기준(단가, 포함수당 등)은 각 기관 지침과 다를 수 있습니다.
+      </p>
+      <div class="row">
+        <div class="field">
+          <label for="wageType">임금형태</label>
+          <select id="wageType">
+            <option value="hourly">시급</option>
+            <option value="daily">일급</option>
+            <option value="monthly">월급</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="wageAmount">금액 (원)</label>
+          <input type="number" id="wageAmount" min="0" step="10" placeholder="예: 12000, 2300000" />
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="hoursPerDay">
+            1일 소정근로시간
+            <span class="small">(시급/월급 모두 입력 권장)</span>
+          </label>
+          <input type="number" id="hoursPerDay" min="0" step="0.5" placeholder="예: 8" />
+        </div>
+        <div class="field">
+          <label for="monthlyWorkDays">
+            월 소정근로일수
+            <span class="small">(월급·일급 → 1일 통상임금 산출용)</span>
+          </label>
+          <input type="number" id="monthlyWorkDays" min="0" step="0.1" placeholder="예: 20.5" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. 결과 -->
+    <section class="card">
+      <h2>5. 결과</h2>
+      <div class="btn-row">
+        <button class="btn" type="button" onclick="calcResult()">미사용 연차수당 계산</button>
+        <button class="btn outline" type="button" onclick="resetAll()">초기화</button>
+      </div>
+      <hr>
+      <div class="result-grid">
+        <div class="result-item">
+          <div class="result-label">부여 연차일수</div>
+          <div class="result-value" id="resGrantedDays">-</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">사용 연차일수</div>
+          <div class="result-value" id="resUsedDays">-</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">미사용 연차일수</div>
+          <div class="result-value highlight" id="resUnusedDays">-</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">1일 통상임금(계산 기준)</div>
+          <div class="result-value" id="resDailyWage">-</div>
+        </div>
+        <div class="result-item">
+          <div class="result-label">미사용 연차수당 (원)</div>
+          <div class="result-value highlight" id="resPayout">-</div>
+        </div>
+      </div>
+      <p class="small muted" style="margin-top:8px;">
+        ※ 원 단위 계산 예시이며, 실제 지급 시에는 <b>10원/100원 단위 절사·반올림</b> 등 기관 규칙을 별도로 적용해야 합니다.
+      </p>
+    </section>
+
+    <section class="card">
+      <h3>참고 메모</h3>
+      <p class="small">
+        - 이 버전은 <b>정적 페이지</b>에서 돌아가는 <b>PoC(개념증명)</b>용입니다.<br>
+        - 이후 단계에서
+        <b>엑셀(인사기록·근무상황) 업로드 → 자동 파싱</b>,
+        <b>단체협약 모듈 분리</b>,
+        <b>회계연도 1월/3월 기준 선택</b>
+        등을 붙일 수 있도록 코드 구조를 느슨하게 짜 두었습니다.
+      </p>
+    </section>
+  </div>
+
+  <script>
+    // ---- 유틸: 숫자 포맷 ----
+    function fmtNumber(n){
+      if(n === null || n === undefined || isNaN(n)) return "-";
+      return n.toLocaleString("ko-KR",{maximumFractionDigits:2});
+    }
+
+    // ---- 0. 월별 행 생성 ----
+    function initAttendanceTable(){
+      const tbody = document.getElementById("attBody");
+      tbody.innerHTML = "";
+      for(let m=1;m<=12;m++){
+        const tr = document.createElement("tr");
+        const th = document.createElement("td");
+        th.textContent = m+"월";
+        const tdPlanned = document.createElement("td");
+        const tdWorked = document.createElement("td");
+
+        const ipPlanned = document.createElement("input");
+        ipPlanned.type = "number";
+        ipPlanned.min = "0";
+        ipPlanned.step = "0.5";
+        ipPlanned.dataset.month = m;
+        ipPlanned.dataset.type = "planned";
+
+        const ipWorked = document.createElement("input");
+        ipWorked.type = "number";
+        ipWorked.min = "0";
+        ipWorked.step = "0.5";
+        ipWorked.dataset.month = m;
+        ipWorked.dataset.type = "worked";
+
+        tdPlanned.appendChild(ipPlanned);
+        tdWorked.appendChild(ipWorked);
+
+        tr.appendChild(th);
+        tr.appendChild(tdPlanned);
+        tr.appendChild(tdWorked);
+        tbody.appendChild(tr);
+      }
+    }
+
+    // ---- 1. 근속연수 계산 ----
+    function calcServiceYears(){
+      const hire = document.getElementById("hireDate").value;
+      const base = document.getElementById("baseDate").value;
+      const view = document.getElementById("serviceYearsView");
+
+      if(!hire || !base){
+        view.textContent = "입사일과 기준일을 모두 입력해야 합니다.";
+        view.classList.add("danger");
+        return;
+      }
+      const hireDate = new Date(hire);
+      const baseDate = new Date(base);
+      if(baseDate < hireDate){
+        view.textContent = "기준일이 입사일보다 빠를 수 없습니다.";
+        view.classList.add("danger");
+        return;
+      }
+      const diffMs = baseDate - hireDate;
+      const years = diffMs / (1000*60*60*24*365.2425);
+      const yearsFloor = Math.floor(years * 10) / 10;
+
+      view.textContent = yearsFloor.toFixed(1) + "년 (대략)";
+      view.classList.remove("danger");
+      view.classList.remove("muted");
+    }
+
+    // ---- 2. 소정근로일 대략 채우기 (대충 20일씩) ----
+    function fillDefaultWorkingDays(){
+      const inputs = document.querySelectorAll("#attBody input[data-type='planned']");
+      inputs.forEach(ip=>{
+        if(!ip.value){
+          ip.value = 20;
+        }
+      });
+    }
+
+    // ---- 3. 출근율 계산 ----
+    function calcAttendance(){
+      const plannedInputs = document.querySelectorAll("#attBody input[data-type='planned']");
+      const workedInputs = document.querySelectorAll("#attBody input[data-type='worked']");
+
+      let totalPlanned = 0;
+      let totalWorked = 0;
+      let fullMonthCount = 0;
+
+      for(let i=0;i<plannedInputs.length;i++){
+        const p = parseFloat(plannedInputs[i].value || "0");
+        const w = parseFloat(workedInputs[i].value || "0");
+        totalPlanned += p;
+        totalWorked += w;
+        // 월 개근: 소정일수=실제근로일수, 둘 다 0이 아닐 때
+        if(p > 0 && p === w){
+          fullMonthCount++;
+        }
+      }
+
+      const rate = totalPlanned>0 ? (totalWorked/totalPlanned*100) : null;
+
+      document.getElementById("totalPlannedView").textContent = fmtNumber(totalPlanned) + " 일";
+      document.getElementById("totalWorkedView").textContent = fmtNumber(totalWorked) + " 일";
+      document.getElementById("attendanceRateView").textContent = rate===null ? "-" : rate.toFixed(1)+" %";
+      document.getElementById("fullMonthCountView").textContent = totalPlanned>0 ? fullMonthCount+" 개월" : "-";
+    }
+
+    // ---- 4. 연차일수 추천 계산 (단순 법정 로직 기준) ----
+    function suggestAnnualDays(){
+      const hire = document.getElementById("hireDate").value;
+      const base = document.getElementById("baseDate").value;
+      const suggestedView = document.getElementById("suggestedDaysView");
+      if(!hire || !base){
+        suggestedView.textContent = "입사일·기준일을 먼저 입력하고 근속연수를 계산해주세요.";
+        suggestedView.classList.add("danger");
+        return;
+      }
+
+      const hireDate = new Date(hire);
+      const baseDate = new Date(base);
+      const diffMs = baseDate - hireDate;
+      const years = diffMs / (1000*60*60*24*365.2425);
+      const fullYears = Math.floor(years);
+
+      // 출근율 가져오기
+      const totalPlannedText = document.getElementById("totalPlannedView").textContent;
+      const totalWorkedText = document.getElementById("totalWorkedView").textContent;
+      const attendanceText = document.getElementById("attendanceRateView").textContent;
+      let rate = null;
+      if(attendanceText && attendanceText.includes("%")){
+        rate = parseFloat(attendanceText.replace("%",""));
+      }
+
+      // 월 개근 개월 수
+      const fullMonthText = document.getElementById("fullMonthCountView").textContent;
+      let fullMonths = 0;
+      if(fullMonthText && fullMonthText.includes("개월")){
+        fullMonths = parseInt(fullMonthText.replace("개월","").trim()) || 0;
+      }
+
+      let suggestedDays = 0;
+      let desc = "";
+
+      // 아주 단순화된 로직 (근로기준법 일반 규정 기준)
+      if(fullYears < 1){
+        // 1년 미만: 매월 개근 1일, 최대 11일 정도로 보는 단순 버전
+        suggestedDays = Math.min(fullMonths,11);
+        desc = `1년 미만 근로: 월 개근 ${fullMonths}개월 → ${suggestedDays}일 (단순 계산)`;
+      }else{
+        // 1년 이상: 출근율 80% 이상이면 15일 + 장기근속 가산
+        if(rate !== null && rate < 80){
+          // 출근율 80% 미만인 경우, 단순화해서 "월 개근 수만큼" 부여하는 버전
+          suggestedDays = fullMonths;
+          desc = `출근율 ${rate.toFixed(1)}% (80% 미만) → 월 개근 ${fullMonths}개월 = ${suggestedDays}일로 단순 계산`;
+        }else{
+          // 출근율 80% 이상: 기본 15일 + 2년에 1일씩 최대 25일까지
+          const extra = Math.max(0, Math.min(10, Math.floor((fullYears - 1)/2)));
+          suggestedDays = 15 + extra;
+          desc = `근속 ${fullYears}년 / 출근율 ${rate===null ? "미입력" : rate.toFixed(1)+"%"} → 기본 15일 + 가산 ${extra}일 = ${suggestedDays}일 (단순 법정 기준)`;
+        }
+      }
+
+      suggestedView.textContent = desc;
+      suggestedView.classList.remove("danger");
+      suggestedView.classList.remove("muted");
+
+      // 실제 부여일수 입력란에 자동 반영 (사용자가 수정 가능)
+      const grantedInput = document.getElementById("grantedDays");
+      if(!grantedInput.value){
+        grantedInput.value = suggestedDays;
+      }
+    }
+
+    // ---- 5. 결과 계산 ----
+    function calcResult(){
+      const granted = parseFloat(document.getElementById("grantedDays").value || "0");
+      const used = parseFloat(document.getElementById("usedDays").value || "0");
+
+      const wageType = document.getElementById("wageType").value;
+      const wageAmount = parseFloat(document.getElementById("wageAmount").value || "0");
+      const hoursPerDay = parseFloat(document.getElementById("hoursPerDay").value || "0");
+      const monthlyWorkDays = parseFloat(document.getElementById("monthlyWorkDays").value || "0");
+
+      // 미사용일수
+      let unused = granted - used;
+      if(unused < 0) unused = 0;
+
+      // 1일 통상임금 계산 (아주 단순 버전)
+      let dailyWage = 0;
+
+      if(wageType === "hourly"){
+        // 시급 × 1일 소정근로시간
+        if(wageAmount > 0 && hoursPerDay > 0){
+          dailyWage = wageAmount * hoursPerDay;
+        }
+      }else if(wageType === "daily"){
+        // 일급 그대로 사용
+        dailyWage = wageAmount;
+      }else if(wageType === "monthly"){
+        // 월급 ÷ 월 소정근로일수
+        if(wageAmount > 0 && monthlyWorkDays > 0){
+          dailyWage = wageAmount / monthlyWorkDays;
+        }
+      }
+
+      const payout = unused * dailyWage;
+
+      // 표시
+      document.getElementById("resGrantedDays").textContent = fmtNumber(granted) + " 일";
+      document.getElementById("resUsedDays").textContent = fmtNumber(used) + " 일";
+      document.getElementById("resUnusedDays").textContent = fmtNumber(unused) + " 일";
+      document.getElementById("resDailyWage").textContent = dailyWage>0 ? fmtNumber(Math.round(dailyWage)) + " 원" : "-";
+      document.getElementById("resPayout").textContent = payout>0 ? fmtNumber(Math.round(payout)) + " 원" : "-";
+    }
+
+    // ---- 6. 초기화 ----
+    function resetAll(){
+      if(!confirm("입력 내용을 모두 초기화할까요?")) return;
+      document.querySelectorAll("input").forEach(ip=>ip.value = "");
+      document.getElementById("year").value = new Date().getFullYear();
+
+      document.getElementById("jobType").value = "";
+      document.getElementById("workType").value = "상시";
+      document.getElementById("wageType").value = "hourly";
+
+      document.getElementById("serviceYearsView").textContent = "입사일·기준일 입력 시 표시됩니다.";
+      document.getElementById("serviceYearsView").className = "small muted";
+
+      document.getElementById("totalPlannedView").textContent = "-";
+      document.getElementById("totalWorkedView").textContent = "-";
+      document.getElementById("attendanceRateView").textContent = "-";
+      document.getElementById("fullMonthCountView").textContent = "-";
+
+      document.getElementById("suggestedDaysView").textContent = "근속연수·출근율 계산 후 [연차일수 추천계산] 버튼을 눌러주세요.";
+      document.getElementById("suggestedDaysView").className = "small muted";
+
+      document.getElementById("resGrantedDays").textContent = "-";
+      document.getElementById("resUsedDays").textContent = "-";
+      document.getElementById("resUnusedDays").textContent = "-";
+      document.getElementById("resDailyWage").textContent = "-";
+      document.getElementById("resPayout").textContent = "-";
+
+      initAttendanceTable();
+    }
+
+    // 초기 진입 시 설정
+    (function init(){
+      const yearInput = document.getElementById("year");
+      const baseDateInput = document.getElementById("baseDate");
+      const now = new Date();
+      yearInput.value = now.getFullYear();
+
+      // 학년도/회계연도 기준일은 나중에 옵션으로 바꾸기 용이하게 그냥 기본값만 오늘로
+      baseDateInput.valueAsDate = now;
+
+      initAttendanceTable();
+    })();
+  </script>
+</body>
+</html>
