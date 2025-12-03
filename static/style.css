@@ -61,6 +61,42 @@ body .muted {
   color: #666;
   font-size: 0.9rem;
 }
+
+/* ---------------------------
+   예외 스타일(상세페이지에서만 사용)
+   필요할 때 클래스 붙여서 전역 규칙 override
+   --------------------------- */
+
+/* 작은 h2 */
+.local-h2 {
+  font-size: 1.3rem !important;
+}
+
+/* 작은 h3 */
+.local-h3 {
+  font-size: 1.1rem !important;
+}
+
+/* 본문보다 조금 큰 강조 텍스트 */
+.local-large {
+  font-size: 1.15rem !important;
+}
+
+/* 본문보다 작은 미세 텍스트 */
+.local-small {
+  font-size: 0.85rem !important;
+}
+
+/* 여백 줄인 버전 */
+.local-tight {
+  margin-bottom: 6px !important;
+}
+
+/* 색상 강조 */
+.local-accent {
+  color: #0051a8 !important;
+}
+
 /* --------------------------- */
 
 
@@ -218,7 +254,7 @@ main {
   color: #111;
 }
 
-/* 링크 한 줄 정렬 (좌측 정렬) */
+/* 링크 한 줄 정렬 */
 .link-row {
   margin-top: 8px;
   display: flex;
