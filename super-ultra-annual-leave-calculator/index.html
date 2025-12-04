@@ -14,7 +14,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <style>
-    /* 이 페이지 전용 컴포넌트 스타일만 약간 추가 */
+    /* 이 페이지 전용 컴포넌트 스타일 */
 
     .field {
       display: flex;
@@ -93,6 +93,22 @@
     .section-header-row p {
       margin: 4px 0 0;
     }
+
+    /* 오류 박스 */
+    #errorCard {
+      display: none;
+    }
+
+    #pyErrorText {
+      white-space: pre-wrap;
+      font-size: 0.9rem;
+      padding: 10px 12px;
+      background: #111;
+      color: #f5f5f5;
+      border-radius: 8px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -101,8 +117,8 @@
     <div class="shell">
       <h1>연차·미사용수당 슈퍼 울트라 계산기 (Pyodide + 나이스 엑셀)</h1>
       <p class="sub">
-        나이스 <b>근무상황목록 엑셀</b>을 업로드해서 복무별 사용시간을 집계하고,<br>
-        같은 페이지에서 <b>연차 부여·미사용수당</b>까지 한 번에 계산하는 정적 페이지 버전입니다.<br>
+        나이스 <b>근무상황목록 엑셀</b>을 업로드해서 복무별 사용시간을 집계하고,<br />
+        같은 페이지에서 <b>연차 부여·미사용수당</b>까지 한 번에 계산하는 정적 페이지 버전입니다.<br />
         모든 금액은 <b>1원 단위 절삭 → 10원 단위 버림</b> 기준으로 표시합니다.
       </p>
     </div>
@@ -333,6 +349,18 @@
         </p>
       </div>
     </section>
+
+    <!-- 4. 파이썬 오류 코드 보기 -->
+    <section class="section" id="errorCard">
+      <h2 class="local-h2">4. 파이썬 오류 메시지 (디버그용)</h2>
+      <p class="muted local-small">
+        Pyodide에서 예외가 발생하면 여기 전체 오류 코드가 표시됩니다.
+        문제가 생기면 이 내용을 복사해서 나중에 나한테 보여줘.
+      </p>
+      <div class="card">
+        <pre id="pyErrorText">(현재 오류 없음)</pre>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -345,10 +373,37 @@
       return Math.floor(Number(v) / 10) * 10;
     }
 
+    // === 오류 박스 제어 ===
+    function clearPyError() {
+      const card = document.getElementById("errorCard");
+      const pre = document.getElementById("pyErrorText");
+      pre.textContent = "(현재 오류 없음)";
+      card.style.display = "none";
+    }
+
+    function showPyError(err, context) {
+      const card = document.getElementById("errorCard");
+      const pre = document.getElementById("pyErrorText");
+      let msg = "";
+      try {
+        msg += context ? `[컨텍스트] ${context}\n\n` : "";
+        msg += String(err);
+        if (err && err.stack) {
+          msg += "\n\n[stack]\n" + err.stack;
+        }
+      } catch (e) {
+        msg = String(err);
+      }
+      pre.textContent = msg;
+      card.style.display = "block";
+      console.error("Pyodide error:", err);
+    }
+
     async function initPyodide() {
       const statusEl = document.getElementById("pyStatus");
       const niceStatus = document.getElementById("niceStatus");
       try {
+        clearPyError();
         statusEl.textContent = "Pyodide 로딩 중...";
         pyodide = await loadPyodide();
 
@@ -362,11 +417,11 @@
         document.getElementById("btnRun").disabled = false;
         document.getElementById("btnAnalyzeNice").disabled = false;
       } catch (e) {
-        console.error(e);
-        statusEl.textContent = "Pyodide 로딩 실패. 콘솔 오류를 확인하세요.";
+        statusEl.textContent = "Pyodide 로딩 실패. 아래 오류 메시지를 확인하세요.";
         statusEl.classList.add("danger");
         niceStatus.textContent = "Pyodide가 준비되지 않아 엑셀 집계를 할 수 없습니다.";
         niceStatus.classList.add("danger");
+        showPyError(e, "Pyodide 초기화/annual_engine.py 로딩 중");
       }
     }
 
@@ -396,6 +451,7 @@
     }
 
     document.getElementById("btnAnalyzeNice").addEventListener("click", async () => {
+      clearPyError();
       if (!pyReady) {
         alert("Pyodide가 아직 준비되지 않았습니다.");
         return;
@@ -487,9 +543,10 @@ summarize_nice_records(py_recs)
           document.getElementById("niceSummaryWrapPy").style.display = "block";
           status.textContent = "집계 완료.";
         } catch (err) {
-          console.error(err);
-          alert("엑셀 집계 중 오류가 발생했습니다. 콘솔을 확인하세요.");
+          alert("엑셀 집계 중 오류가 발생했습니다. 아래 오류 박스를 확인해주세요.");
           status.textContent = "오류 발생.";
+          status.classList.add("danger");
+          showPyError(err, "summarize_nice_records 실행 중");
         }
       };
       reader.readAsArrayBuffer(file);
@@ -505,12 +562,14 @@ summarize_nice_records(py_recs)
           ? "엑셀 파일을 선택한 뒤 [엑셀 업로드·복무별 집계] 버튼을 누르세요."
           : "Pyodide가 준비되면 업로드 가능해집니다.";
       niceStatus.classList.remove("danger");
+      clearPyError();
     });
 
     // ---------------------------
     // 2. full_pipeline 호출 (연차·수당)
     // ---------------------------
     document.getElementById("btnRun").addEventListener("click", async () => {
+      clearPyError();
       if (!pyReady) {
         alert("Pyodide가 아직 준비되지 않았습니다.");
         return;
@@ -592,8 +651,8 @@ full_pipeline("${ruleId}", svc_js, wage_js, ${granted}, ${used})
         document.getElementById("resRoundingRule").textContent =
           `${step}원 단위 ${modeLabel} + 1원 단위 공통 절삭`;
       } catch (e) {
-        console.error(e);
-        alert("파이썬 엔진 실행 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
+        alert("연차·수당 계산 중 오류가 발생했습니다. 아래 오류 박스를 확인해주세요.");
+        showPyError(e, "full_pipeline 실행 중");
       }
     });
   </script>
