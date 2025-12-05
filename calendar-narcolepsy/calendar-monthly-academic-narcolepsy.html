@@ -291,7 +291,7 @@
     <div class="sticky-inner">
       <h1 id="title">학년도별 월간 업무 일정 달력</h1>
       <div class="top-buttons">
-        <a href="/calendar/" class="btn-top">학년도별 페이지로</a>
+        <a href="/calendar-narcolepsy/" class="btn-top">학년도별 페이지로</a>
         <a href="/" class="btn-top">메인으로</a>
       </div>
     </div>
@@ -476,7 +476,7 @@
           const dt=new Date(y,m-1,day);
           dt.setDate(dt.getDate()-dt.getDay());
           const wk=ymd(dt.getFullYear(),dt.getMonth()+1,dt.getDate());
-          const link=`/calendar/calendar-weekly-academic.html?start=${wk}&weeks=1`;
+          const link=`/calendar-narcolepsy/calendar-weekly-academic-narcolepsy.html?start=${wk}&weeks=1`;
 
           h+=`
             <div class="cell">
